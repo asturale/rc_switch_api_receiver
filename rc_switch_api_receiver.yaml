@@ -74,14 +74,14 @@ remote_receiver:
   idle: 4ms
   on_rc_switch:
     - lambda: |-
-          # Converts received data to string with 1's and 0's
-          uint64_t code = x.code;
-          char binary_str[25];    # tweak the length depending on protocol, +1 for null terminator
-          binary_str[24] = '\0';  # Null terminator
+          // Converts received data to string with 1s and 0s
+          uint64_t data = x.code;
+          char binary_str[25];    // tweak the length depending on protocol, +1 for null terminator
+          binary_str[24] = '\0'; // Null terminator
           for (int i = 23; i >= 0; --i) {
-              binary_str[23 - i] = (code & (1ULL << i)) ? '1' : '0';
+              binary_str[23 - i] = (data & (1ULL << i)) ? '1' : '0';
           }
-          id(code) = binary_str; #Save as global variable as x.code is not avaiable in binary_sensor
+          id(rccode) = binary_str; //Save as global variable as x.code is not avaiable in binary_sensor
 
 http_request:
 # Uncomment when using framwork: arduino. Not safe!
