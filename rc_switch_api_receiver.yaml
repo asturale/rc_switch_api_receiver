@@ -1,0 +1,110 @@
+# ESPHome configuration file to push received rc_switch codes to API
+# Uses LoRa sp127x radio board but can be modified to use other radio modules
+#
+# How to use:
+# - Configure secrets.yaml with Wifi credenials, API endpoint and authentication token
+# - Ceck/configure your GPIO pins
+# - Check/configure frequency, bandwith and modulation
+# - Adjust protocol and code length
+#
+# $ esphome run rc_switch_api_receiver.yaml
+
+esphome:
+  name: rcapireceiver #no underscores for mdns compatibility
+  friendly_name: rc_switch to API receiver
+
+esp32:
+  board: esp32dev #Change to your board
+  framework:
+    type: esp-idf #needed for SSL verification
+
+# Provides sp127x support for ESPHome
+external_components:
+  - source: github://pr#7490
+    components: [ sx127x ]
+
+wifi:
+  ssid: !secret wifi_name
+  password: !secret wifi_pass
+  fast_connect: true
+  power_save_mode: HIGH
+
+logger:
+  level: VERBOSE
+#  level: DEBUG
+
+api:
+ota:
+  - platform: esphome
+
+# Enable for wireless debugging
+#web_server:
+#  port: 80
+
+globals:
+  - id: rccode
+    type: std::string
+    initial_value: ''
+
+# Check your board
+spi:
+  clk_pin: GPIO5
+  mosi_pin: GPIO27
+  miso_pin: GPIO19
+
+
+sx127x:
+# Check your board
+  cs_pin: GPIO18
+  rst_pin: GPIO23
+# Configure frequency, bandwith, modulation and rx_floor (sensitivity)
+  frequency: 433889000
+  modulation: OOK
+  rx_start: true
+  rx_bandwidth: 125_0kHz
+  rx_floor: -120
+
+remote_receiver:
+# Check your board
+  pin: GPIO34 #DPIO2
+  dump:
+   - rc_switch
+  tolerance: 50%
+# may need some tweaking depending on your remote
+  idle: 4ms
+  on_rc_switch:
+    - lambda: |-
+          # Converts received data to string with 1's and 0's
+          uint64_t code = x.code;
+          char binary_str[25];    # tweak the length depending on protocol, +1 for null terminator
+          binary_str[24] = '\0';  # Null terminator
+          for (int i = 23; i >= 0; --i) {
+              binary_str[23 - i] = (code & (1ULL << i)) ? '1' : '0';
+          }
+          id(code) = binary_str; #Save as global variable as x.code is not avaiable in binary_sensor
+
+http_request:
+# Uncomment when using framwork: arduino. Not safe!
+#  verify_ssl: false
+
+binary_sensor:
+# We use binary sensor for every received code as remote_receiver does not support delayed_off and most remotes repeat the signal several times
+  - platform: remote_receiver
+    name: "RC API Receiver"
+    internal: true
+    rc_switch_raw:
+      protocol:  1 #tweak depending on the protocol you want to receiver
+      code: "xxxxxxxxxxxxxxxxxxxxxxxx" #x=wildcard, adjust length
+    filters:
+      - delayed_off: 4s  #only run once in case of repeated signals
+    on_press:
+      then:
+      - delay: 1ms # Give remote_receiver a chance to update our rccode variable. Removing will result in empty/old code
+      - http_request.post:
+          url: !secret api_url
+          headers:
+            Content-Type: application/json
+            Authorization: !secret api_token
+          # JSON body
+          json:
+            code: !lambda 'return id(rccode);'
