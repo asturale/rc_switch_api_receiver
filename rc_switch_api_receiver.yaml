@@ -70,7 +70,7 @@ sx127x:
   frequency: 433889000
   modulation: OOK
   rx_start: true
-  rx_bandwidth: 125_0kHz
+  bandwidth: 125_0kHz
   rx_floor: -120
 
 remote_receiver:
