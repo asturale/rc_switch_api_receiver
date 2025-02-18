@@ -26,8 +26,8 @@ external_components:
 wifi:
   ssid: !secret wifi_name
   password: !secret wifi_pass
-  fast_connect: true
-  power_save_mode: HIGH
+  fast_connect: false #connect to strongest accesspoint instead of first to see
+  power_save_mode: none #powersave causes disconnects
 
   ap:
     ssid: !secret wifi_ap_name
